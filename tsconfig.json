@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"lib": ["es5", "es6", "es2017", "es2020", "dom"],
+		"target": "es5",
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"outDir": "./dist",
+		"emitDecoratorMetadata": true,
+		"experimentalDecorators": true,
+		"sourceMap": true,
+		"strict": true,
+		"noImplicitAny": true,
+		"downlevelIteration": true,
+		"types": [],
+
+		"typeRoots": [
+			"src/types/global.d.ts",
+			"src/types/module.d.ts"
+		]
+	},
+	"include": [
+		"src/**/*"
+	]
+}
