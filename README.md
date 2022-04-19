@@ -1,1 +1,0 @@
-# icicb-bridge-backend
