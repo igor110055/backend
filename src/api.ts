@@ -1,22 +1,23 @@
-require("dotenv").config()
-import * as express from 'express'
-import axios from 'axios'
-import MySQLModel from './MySQLModel'
-import { setlog } from './helper'
+require("dotenv").config();
+import * as express from 'express';
+import axios from 'axios';
+import MySQLModel from './MySQLModel';
+import { setlog } from './helper';
+import { listenerCount } from 'process';
 
-const router = express.Router()
-const Web3 = require('web3')
-const Tokens = new MySQLModel('tokens')
-const Prices = new MySQLModel('prices', 'key')
-const Blocks = new MySQLModel('blocks', 'key')
-const Events = new MySQLModel('events', 'key')
+const router = express.Router();
+const Web3 = require('web3');
+const Tokens = new MySQLModel('tokens');
+const Prices = new MySQLModel('prices', 'key');
+const Blocks = new MySQLModel('blocks', 'key');
+const Events = new MySQLModel('events', 'key');
 
-const networks = require('../../frontend/src/config/networks.json')
-const abi = require('../../frontend/src/config/abis/Bridge.json')
+const networks = require('../../frontend/src/config/networks.json');
+const abi = require('../../frontend/src/config/abis/Bridge.json');
 
 const utils = new Web3().utils;
-const toHex = (val: string | number): string => utils.toHex(val)
-const NULLADDRESS = '0x0000000000000000000000000000000000000000'
+const toHex = (val: string | number): string => utils.toHex(val);
+const NULLADDRESS = '0x0000000000000000000000000000000000000000';
 
 interface GlobalType {
 	keys: { [network: string]: string }
@@ -41,12 +42,10 @@ interface PriceType {
 
 const G: GlobalType = {
 	keys: {
-		ICICB: process.env.PRIVKEY_ICICB || '',
-		ETH: process.env.PRIVKEY_ETH || '',
+
 		BSC: process.env.PRIVKEY_BSC || '',
-		HT: process.env.PRIVKEY_HT || '',
-		FTM: process.env.PRIVKEY_FTM || '',
-		TRX: process.env.PRIVKEY_TRX || '',
+		CRO: process.env.PRIVKEY_CRO || '',
+		POL: process.env.PRIVKEY_POL || '',
 	},
 	prices: {},
 	chainIds: {},
@@ -58,19 +57,13 @@ export const initApp = async () => {
 	setlog("Read tokens")
 	const rowTokens: any = await Tokens.find({}, { id: 1 })
 	for (let v of rowTokens) {
-		if (G.tokens[v.chain] === undefined)
-			G.tokens[v.chain] = {}
-
+		if (G.tokens[v.chain] === undefined) G.tokens[v.chain] = {}
 		G.tokens[v.chain][v.token] = { symbol: v.symbol, decimals: v.decimals }
-
-		if (G.coins[v.symbol] === undefined)
-			G.coins[v.symbol] = {}
-
+		if (G.coins[v.symbol] === undefined) G.coins[v.symbol] = {}
 		G.coins[v.symbol][v.chain] = { address: v.token, decimals: v.decimals }
 	}
 	for (let k in networks) {
-		if (G.chainIds[networks[k].chainId] === undefined)
-			G.chainIds[networks[k].chainId] = k
+		if (G.chainIds[networks[k].chainId] === undefined) G.chainIds[networks[k].chainId] = k
 	}
 	setlog("Read prices")
 	const rowPrices: any = await Prices.find()
@@ -103,18 +96,7 @@ export const cronChain = async (key: string) => {
 
 export const checkPrices = async (): Promise<Array<PriceType>> => {
 	const pairs: { [key: string]: string } = {
-		BTC: 'BTCUSDT',
-		ETH: 'ETHUSDT',
-		LTC: 'LTCUSDT',
-		BCH: 'BCHUSDT',
-		/* ZEC: 'ZECUSDT', */
-		DOGE: 'DOGEUSDT',
-		XRP: 'XRPUSDT',
 		BNB: 'BNBUSDT',
-		USDC: 'USDCUSDT',
-		/* DOT: 'DOTUSDT',
-		EOS: 'EOSUSDT', */
-		LINK: 'LINKUSDT',
 	}
 
 	const inserts: Array<PriceType> = [];
@@ -142,18 +124,27 @@ export const checkPrices = async (): Promise<Array<PriceType>> => {
 
 const evm_sendtx = async (feeOnly: boolean, rpc: string, privkey: string, to: string, abi: any, method: string, args: any[]): Promise<string | bigint | null> => {
 	try {
+
+		// const tx = await evm_sendtx(false, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [param])
+		console.log('feeOnly, rpc, privkey, to, "abi", method, args')
+		console.log(feeOnly, rpc, privkey, to, 'abi', method, args)
+
 		const web3 = new Web3(rpc)
 		const account = web3.eth.accounts.privateKeyToAccount(privkey)
 		const contract = new web3.eth.Contract(abi, to, { from: account.address, })
 		const data = contract.methods[method](...args).encodeABI()
 		const gasPrice = await web3.eth.getGasPrice()
 		const gasLimit = await contract.methods[method](...args).estimateGas()
-		if (feeOnly) return BigInt(gasPrice) * BigInt(gasLimit) // Math.ceil(Number(gasPrice)/1e9 * gasLimit / 1e3)/1e6;
+		if (feeOnly)
+			return BigInt(gasPrice) * BigInt(gasLimit) // Math.ceil(Number(gasPrice)/1e9 * gasLimit / 1e3)/1e6;
+
 		const json = { gasPrice, gasLimit, to, value: 0x0, data }
 		const signedTx: any = await web3.eth.accounts.signTransaction(json, privkey)
 		const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction)
 		if (receipt && receipt.transactionHash) return receipt.transactionHash
 	} catch (err: any) {
+
+		setlog('evm_sendtx  Err :')
 		setlog(err)
 	}
 	return null
@@ -193,9 +184,9 @@ const checkChain = async (key: string) => {
 		const web3 = new Web3(net.rpc)
 		const contract = new web3.eth.Contract(abi, net.bridge)
 		const height = await web3.eth.getBlockNumber()
-
 		const row = await Blocks.findOne(key);
 		if (row !== null) {
+
 			const start = row.height + 1;
 			const limit = 1000
 			const inserts = [];
@@ -218,17 +209,32 @@ const checkChain = async (key: string) => {
 		}
 		await Blocks.insertOrUpdate({ key, height })
 	} catch (err: any) {
-		setlog("hook-" + key, err)
+		setlog("checkChain : hook-" + key, err)
 	}
 }
 
 const getTokenFee = (fee: bigint, chain: string, token: string) => {
 	// BigInt(10**(G.tokens[chain][token].decimals - 6))
+	// setlog('getTokenFee start')
+	// setlog('fee, chain, token')
+	// setlog('fee :' + fee)
+	// setlog('chain : ' + chain)
+	// setlog('token : ' + token)
+	// setlog('G.prices[networks[chain].coin] : ' + G.prices[networks[chain].coin])
+	// setlog('G.prices[token] : ' + G.prices[token])
 	const rate = BigInt(Math.round(G.prices[networks[chain].coin] * 1e6 / G.prices[token]))
+	setlog('rate ' + rate)
 	return fee * rate / BigInt(1e6)
+	// return fee
 }
 
 const getTxParams = (chain: string, rows: Array<any>, fee?: bigint) => {
+
+	// const param = getTxParams(key, ts, realfee);
+	setlog('key, ts, realfee')
+	console.log(chain)
+	console.log(rows)
+	console.log(fee)
 	const params = []
 	for (let row of rows) {
 		if (row) {
@@ -238,9 +244,10 @@ const getTxParams = (chain: string, rows: Array<any>, fee?: bigint) => {
 				let value = BigInt(row.value)
 				let extra = row.key
 				if (fee) {
-					const realfee = getTokenFee(fee, chain, symbol)// BigInt(Math.ceil( * 1e6)) * BigInt(10**(G.tokens[chain][token].decimals - 6))
-					if (value < realfee) continue
-					value -= realfee
+					// const realfee = getTokenFee(fee, chain, symbol)// BigInt(Math.ceil( * 1e6)) * BigInt(10**(G.tokens[chain][token].decimals - 6))
+					// setlog('getTokenFee -> realfee : ' + realfee)
+					// if (value < realfee) continue
+					// value -= realfee
 				}
 				if (token) {
 					params.push([
@@ -253,6 +260,7 @@ const getTxParams = (chain: string, rows: Array<any>, fee?: bigint) => {
 			}
 		}
 	}
+	console.log('params : ' + params)
 	return params
 }
 
@@ -264,6 +272,7 @@ const checkEvents = async (key: string) => {
 			const updated = Math.round(new Date().getTime() / 1000)
 			const rowTxs: { [txId: string]: any } = {}
 			const chains: { [chainId: string]: Array<string> } = {}
+
 			for (let v of rows) {
 				rowTxs[v.key] = v;
 				if (chains[v.chain] === undefined) chains[v.chain] = []
@@ -287,50 +296,59 @@ const checkEvents = async (key: string) => {
 
 				for (let i = 0; i < count; i += limit) {
 					let iEnd = i + limit
-					if (iEnd > count) iEnd = count
+					if (iEnd > count)
+						iEnd = count
 					const ts = []
 					for (let k = i; k < iEnd; k++) {
 						ts.push(rowTxs[txs[k]])
 					}
-					if (key === 'ICICB') {
-						const tx = await evm_sendtx(false, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [getTxParams(key, ts)])
+					// if (key === 'ICICB') {
+					// 	const tx = await evm_sendtx(false, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [getTxParams(key, ts)])
+					// 	if (typeof tx === 'string') {
+					// 		for (let v of ts) {
+					// 			updates.push({ key: v.key, tx, fee: "0", sendvalue: v.value, err: 0, senderr: 0, updated })
+					// 			setlog(`send: target ${key} from:[address:${v.address}, value:${v.value} tx:${v.key}] ${tx}`)
+					// 		}
+					// 	}
+					// } else {
+					const fee = await evm_sendtx(true, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [getTxParams(key, ts)])
+					setlog('this is fee result: ' + fee);
+					if (typeof fee === 'bigint') {
+						setlog('fee is bigint: ' + typeof fee);
+
+						const realfee = fee / BigInt(ts.length)
+						setlog('realfee is : ' + realfee);
+						const param = getTxParams(key, ts, realfee);
+						setlog('param is : ' + param);
+						// current here is normal
+
+
+						const tx = await evm_sendtx(false, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [param])
 						if (typeof tx === 'string') {
 							for (let v of ts) {
-								updates.push({ key: v.key, tx, fee: "0", sendvalue: v.value, err: 0, senderr: 0, updated })
-								setlog(`send: target ${key} from:[address:${v.address}, value:${v.value} tx:${v.key}] ${tx}`)
+								updates.push({ key: v.key, tx, fee: '0x' + realfee.toString(16), sendvalue: v.value, err: 0, senderr: 0, updated })
+								setlog(`send: target ${key} from:[address:${v.address}, value:${v.value}, fee:${realfee}, tx:${v.key}] ${tx}`)
 							}
 						}
 					} else {
-						const fee = await evm_sendtx(true, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [getTxParams(key, ts)])
-
-						if (typeof fee === 'bigint') {
-							const realfee = fee / BigInt(ts.length)
-							const param = getTxParams(key, ts, realfee);
-							const tx = await evm_sendtx(false, net.rpc, G.keys[key], net.bridge, abi, 'transfer', [param])
-							if (typeof tx === 'string') {
-								for (let v of ts) {
-									updates.push({ key: v.key, tx, fee: '0x' + realfee.toString(16), sendvalue: v.value, err: 0, senderr: 0, updated })
-									setlog(`send: target ${key} from:[address:${v.address}, value:${v.value}, fee:${realfee}, tx:${v.key}] ${tx}`)
-								}
-							}
-						} else {
-							for (let v of ts) {
-								updates.push({ key: v.key, tx: null, fee: "0", sendvalue: "0", err: 0, senderr: 1, updated })
-							}
-							setlog(`send: target ${key} fee error`)
+						for (let v of ts) {
+							updates.push({ key: v.key, tx: null, fee: "0", sendvalue: "0", err: 0, senderr: 1, updated })
 						}
+						setlog(`send: target ${key} fee error`)
 					}
+					// }
 				}
 			}
 			if (updates.length) await Events.insertOrUpdate(updates)
 		}
 	} catch (err: any) {
-		setlog("hook-" + key, err)
+		setlog("checkEvents : hook-" + key, err)
 	}
 }
 
 router.post("/get-txs", async (req, res, next) => {
 	try {
+		console.log('client request')
 		const txs = req.body
 		if (txs.length > 10) return res.status(429).json({ err: 'too many requests' })
 		if (!Array.isArray(txs)) return res.status(429).json({ err: 'invalid format' })
@@ -360,7 +378,31 @@ router.post("/get-txs", async (req, res, next) => {
 })
 
 router.get("/all-tokens", async (req, res, next) => {
-	res.json(G.coins)
+	res.json(G.coins);
 })
 
+router.post("/input-chain-info", async (req, res, next) => {
+	try {
+		console.log('client request input-chain-info')
+		console.log(req.body);
+		const chainInfo = await Tokens.find();
+		// console.log(chainInfo)
+		const data = req.body;
+		// myOjbect is the object you want to iterate.
+		// Notice the second argument (secondArg) we passed to .forEach.
+		Tokens.deleteAll();
+		Object.keys(data.info).forEach(async function (element, index, _array) {
+			// element is the name of the key.
+			// key is just a numerical value for the array
+			// _array is the array of all the keys
+			console.log(element, data.info[element].address, data.info[element].decimals, data.token);
+			await Tokens.insertOrUpdate({ 'chain': element, 'token': data.info[element].address, 'symbol': data.token, 'decimals': data.info[element].decimals });
+
+		});
+		// await Blocks.insertOrUpdate({ key, height })
+	} catch (err: any) {
+		setlog(err);
+	}
+	res.status(404).json({ err: 'unknown' })
+})
 export default router
