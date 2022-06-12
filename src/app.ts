@@ -8,6 +8,7 @@ import * as express from 'express';
 import * as shrinkRay from 'shrink-ray-current'
 import * as cors from 'cors'
 
+import "./db_create";
 import Api, { initApp } from './api'
 import MySQL from './MySQLModel';
 import { setlog } from './helper';
@@ -28,8 +29,9 @@ MySQL.connect({
 	user: process.env.DB_USER,
 	password: process.env.DB_PASS,
 	database: process.env.DB_NAME
-}).then(async () => {
+}).then(async (connect_result: any) => {
 	try {
+		console.log('server runing.........')
 		await initApp();
 		const app = express()
 		const server = http.createServer(app)
