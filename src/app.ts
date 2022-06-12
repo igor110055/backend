@@ -45,7 +45,7 @@ MySQL.connect({
 				// const ca = caBundle.split('-----END CERTIFICATE-----\n') .map((cert) => cert +'-----END CERTIFICATE-----\n')
 				// ca.pop()
 				// const options = {cert,key,ca}
-				// const httpsServer = https.createServer(options,app)
+				const httpsServer = https.createServer(app)
 
 
 				app.use(shrinkRay())
@@ -83,8 +83,8 @@ MySQL.connect({
 				await new Promise(resolve => server.listen(port, () => resolve(true)))
 				setlog(`Started HTTP service on port ${port}. ${+new Date() - time}ms`)
 				time = +new Date()
-				// await new Promise(resolve=>httpsServer.listen(portHttps, ()=>resolve(true)))
-				// setlog(`Started HTTPS service on port ${portHttps}. ${+new Date()-time}ms`)
+				await new Promise(resolve => httpsServer.listen(portHttps, () => resolve(true)))
+				setlog(`Started HTTPS service on port ${portHttps}. ${+new Date() - time}ms`)
 
 			} else {
 				console.log('no success')
