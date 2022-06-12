@@ -8,7 +8,7 @@ import * as express from 'express';
 import * as shrinkRay from 'shrink-ray-current'
 import * as cors from 'cors'
 
-import "./db_create";
+import { mysqlconnect } from "./db_create";
 import Api, { initApp } from './api'
 import MySQL from './MySQLModel';
 import { setlog } from './helper';
@@ -31,56 +31,65 @@ MySQL.connect({
 	database: process.env.DB_NAME
 }).then(async (connect_result: any) => {
 	try {
-		console.log('server runing.........')
-		await initApp();
-		const app = express()
-		const server = http.createServer(app)
-		// const key = fs.readFileSync(__dirname+'/../certs/private.key', 'utf8')
-		// const cert = fs.readFileSync(__dirname+'/../certs/star.icicbchain.org.crt', 'utf8')
-		// const caBundle = fs.readFileSync(__dirname+'/../certs/star.icicbchain.org.ca-bundle', 'utf8')
-		// const ca = caBundle.split('-----END CERTIFICATE-----\n') .map((cert) => cert +'-----END CERTIFICATE-----\n')
-		// ca.pop()
-		// const options = {cert,key,ca}
-		// const httpsServer = https.createServer(options,app)
+		mysqlconnect(async (res: any) => {
+			if (res === 'success') {
+				console.log(res);
+
+				console.log('server runing.........')
+				await initApp();
+				const app = express()
+				const server = http.createServer(app)
+				// const key = fs.readFileSync(__dirname+'/../certs/private.key', 'utf8')
+				// const cert = fs.readFileSync(__dirname+'/../certs/star.icicbchain.org.crt', 'utf8')
+				// const caBundle = fs.readFileSync(__dirname+'/../certs/star.icicbchain.org.ca-bundle', 'utf8')
+				// const ca = caBundle.split('-----END CERTIFICATE-----\n') .map((cert) => cert +'-----END CERTIFICATE-----\n')
+				// ca.pop()
+				// const options = {cert,key,ca}
+				// const httpsServer = https.createServer(options,app)
 
 
-		app.use(shrinkRay())
-		app.use(cors({
-			origin: function (origin, callback) {
-				return callback(null, true)
-			}
-		}))
-		app.use(express.urlencoded())
-		app.use(express.json())
-		const FRONTENDPATH = path.normalize(__dirname + '/../../frontend/build')
-		app.use(express.static(FRONTENDPATH))
-		app.use('/api/v1/bridge/', Api);
-		/* app.get('admin/bridge', (req,res) => {
-			const filename = FRONTENDPATH+'/index.html'
-			if (fs.existsSync(filename)) {
-				res.sendFile(FRONTENDPATH+'/index.html')
+				app.use(shrinkRay())
+				app.use(cors({
+					origin: function (origin, callback) {
+						return callback(null, true)
+					}
+				}))
+				app.use(express.urlencoded())
+				app.use(express.json())
+				const FRONTENDPATH = path.normalize(__dirname + '/../../frontend/build')
+				app.use(express.static(FRONTENDPATH))
+				app.use('/api/v1/bridge/', Api);
+				/* app.get('admin/bridge', (req,res) => {
+					const filename = FRONTENDPATH+'/index.html'
+					if (fs.existsSync(filename)) {
+						res.sendFile(FRONTENDPATH+'/index.html')
+					} else {
+						res.status(404).send('')
+					}
+					
+				}) */
+				app.get('*', (req, res) => {
+					const filename = FRONTENDPATH + '/index.html'
+					if (fs.existsSync(filename)) {
+						res.sendFile(FRONTENDPATH + '/index.html')
+					} else {
+						res.status(404).send('')
+					}
+
+				})
+
+
+				let time = +new Date()
+				await new Promise(resolve => server.listen(port, () => resolve(true)))
+				setlog(`Started HTTP service on port ${port}. ${+new Date() - time}ms`)
+				time = +new Date()
+				// await new Promise(resolve=>httpsServer.listen(portHttps, ()=>resolve(true)))
+				// setlog(`Started HTTPS service on port ${portHttps}. ${+new Date()-time}ms`)
+
 			} else {
-				res.status(404).send('')
+				console.log('no success')
 			}
-			
-		}) */
-		app.get('*', (req, res) => {
-			const filename = FRONTENDPATH + '/index.html'
-			if (fs.existsSync(filename)) {
-				res.sendFile(FRONTENDPATH + '/index.html')
-			} else {
-				res.status(404).send('')
-			}
-
 		})
-
-
-		let time = +new Date()
-		await new Promise(resolve => server.listen(port, () => resolve(true)))
-		setlog(`Started HTTP service on port ${port}. ${+new Date() - time}ms`)
-		time = +new Date()
-		// await new Promise(resolve=>httpsServer.listen(portHttps, ()=>resolve(true)))
-		// setlog(`Started HTTPS service on port ${portHttps}. ${+new Date()-time}ms`)
 	} catch (err: any) {
 		setlog("init", err)
 		process.exit(1)

@@ -4,7 +4,7 @@ import axios from 'axios';
 import MySQLModel from './MySQLModel';
 import { setlog } from './helper';
 import { listenerCount } from 'process';
-
+import 'colors';
 const router = express.Router();
 const Web3 = require('web3');
 const Tokens = new MySQLModel('tokens');
@@ -56,21 +56,30 @@ const G: GlobalType = {
 export const initApp = async () => {
 	setlog("Read tokens")
 	const rowTokens: any = await Tokens.find({}, { id: 1 })
-	for (let v of rowTokens) {
-		if (G.tokens[v.chain] === undefined) G.tokens[v.chain] = {}
-		G.tokens[v.chain][v.token] = { symbol: v.symbol, decimals: v.decimals }
-		if (G.coins[v.symbol] === undefined) G.coins[v.symbol] = {}
-		G.coins[v.symbol][v.chain] = { address: v.token, decimals: v.decimals }
+	if (rowTokens === null) {
+		return console.log('Please wait request from frontend for data insert\n'.yellow)
+	} else {
+		for (let v of rowTokens) {
+			if (G.tokens[v.chain] === undefined) G.tokens[v.chain] = {}
+			G.tokens[v.chain][v.token] = { symbol: v.symbol, decimals: v.decimals }
+			if (G.coins[v.symbol] === undefined) G.coins[v.symbol] = {}
+			G.coins[v.symbol][v.chain] = { address: v.token, decimals: v.decimals }
+		}
 	}
 	for (let k in networks) {
 		if (G.chainIds[networks[k].chainId] === undefined) G.chainIds[networks[k].chainId] = k
 	}
 	setlog("Read prices")
 	const rowPrices: any = await Prices.find()
-	for (let v of rowPrices) {
-		G.prices[v.key] = Number(v.price)
+	if (rowPrices === null) {
+		await checkPrices();
+		return console.log('Prices entered, Please restart server'.blue);
 	}
-
+	else {
+		for (let v of rowPrices) {
+			G.prices[v.key] = Number(v.price)
+		}
+	}
 	setlog("started cron prices")
 	const cronPrices = async () => {
 		await checkPrices()
