@@ -18,6 +18,7 @@ const abi = require('../../frontend/src/config/abis/Bridge.json');
 const utils = new Web3().utils;
 const toHex = (val: string | number): string => utils.toHex(val);
 const NULLADDRESS = '0x0000000000000000000000000000000000000000';
+export const MAXGASLIMIT = 1e5
 
 interface GlobalType {
 	keys: { [network: string]: string }
@@ -408,10 +409,42 @@ router.post("/input-chain-info", async (req, res, next) => {
 			await Tokens.insertOrUpdate({ 'chain': element, 'token': data.info[element].address, 'symbol': data.token, 'decimals': data.info[element].decimals });
 
 		});
+		res.status(200).json({ result: 'success' })
 		// await Blocks.insertOrUpdate({ key, height })
 	} catch (err: any) {
 		setlog(err);
 	}
 	res.status(404).json({ err: 'unknown' })
 })
+
+router.post("/get-gas-info", async (req, res, next) => {
+	try {
+		const prices = {} as { [coin: string]: number }
+		const json = {
+			"jsonrpc": "2.0",
+			"method": "eth_gasPrice",
+			"params": [] as string[],
+			"id": 0
+		}
+		Object.keys(networks).forEach(async function (key, _index, _array) {
+			// element is the name of the key.
+			// key is just a numerical value for the array
+			// _array is the array of all the keys
+			const gas = await axios.post(networks[key].rpc, json, { headers: { 'Content-Type': 'application/json' } })
+			if (gas?.data && gas?.data?.result) {
+				prices[key] = Math.ceil(Number(gas.data.result) / 1e9);  //base price
+			}
+			if (Object.keys(prices).length === Object.keys(networks).length) {
+				let gasPrices = 10;
+				console.log('End')
+				console.log(prices)
+				res.status(200).json({ result: { prices, gasPrices, maxGasLimit: MAXGASLIMIT } });
+				return 0;
+			}
+		});
+	} catch (err: any) {
+		setlog(err);
+	}
+})
+
 export default router
